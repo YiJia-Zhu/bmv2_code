@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-08-24T16:15:21.463948+00:00",
+  "source": "/home/p4/bmv2_code/data/normalized/hf_p4llms/hf_p4llms_all_records.jsonl",
+  "results": "/home/p4/bmv2_code/data/normalized/hf_p4llms/hf_p4llms_bmv2_compile_results.jsonl",
+  "output_root": "/home/p4/bmv2_code/data/raw/hf/p4dataset_supplemental",
+  "proxy": null,
+  "unique_dependency_count": 248,
+  "selected_dependency_count": 248,
+  "manifest_entry_count": 443,
+  "unresolvable_count": 0,
+  "by_status": {
+    "requested": 248,
+    "downloaded": 1,
+    "existing": 204,
+    "failed": 43
+  },
+  "manifest_reconciled_at": "2026-08-24T16:19:01.439250+00:00",
+  "manifest_reconciled_orphans_added": 165
+}

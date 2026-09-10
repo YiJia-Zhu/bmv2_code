@@ -1,0 +1,7 @@
+papers/
+discussions/
+rfcs/
+synthetic/
+other/
+*.json
+*.jsonl

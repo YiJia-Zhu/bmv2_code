@@ -1,0 +1,9 @@
+.github_token
+dataset/
+logs/
+*.zip
+*.json
+bigcode-dataset/
+__pycache__/
+*.pyc
+output/

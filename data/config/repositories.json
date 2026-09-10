@@ -1,0 +1,150 @@
+[
+  {
+    "id": "p4lang__p4c",
+    "repository": "p4lang/p4c",
+    "url": "https://github.com/p4lang/p4c.git",
+    "role": "P4_16 compiler tests, BMv2 backend, P4Tools test generation, positive and negative examples",
+    "families": ["p4_16", "bmv2", "ebpf", "compiler_tests"]
+  },
+  {
+    "id": "p4lang__behavioral-model",
+    "repository": "p4lang/behavioral-model",
+    "url": "https://github.com/p4lang/behavioral-model.git",
+    "role": "BMv2 reference software switch, runtime behavior and test fixtures",
+    "families": ["bmv2", "runtime", "simple_switch", "tests"]
+  },
+  {
+    "id": "p4lang__tutorials",
+    "repository": "p4lang/tutorials",
+    "url": "https://github.com/p4lang/tutorials.git",
+    "role": "BMv2 task seeds, skeleton programs, solutions, PTF and P4Runtime examples",
+    "families": ["bmv2", "tutorials", "p4runtime", "ptf"]
+  },
+  {
+    "id": "p4lang__p4runtime",
+    "repository": "p4lang/p4runtime",
+    "url": "https://github.com/p4lang/p4runtime.git",
+    "role": "P4Runtime specification, protobufs and control-plane reference material",
+    "families": ["p4runtime", "specification"]
+  },
+  {
+    "id": "p4lang__p4runtime-shell",
+    "repository": "p4lang/p4runtime-shell",
+    "url": "https://github.com/p4lang/p4runtime-shell.git",
+    "role": "Python P4Runtime control-plane shell and examples",
+    "families": ["p4runtime", "control_plane", "python"]
+  },
+  {
+    "id": "p4lang__PI",
+    "repository": "p4lang/PI",
+    "url": "https://github.com/p4lang/PI.git",
+    "role": "P4Runtime server implementation framework and tests",
+    "families": ["p4runtime", "runtime", "control_plane"]
+  },
+  {
+    "id": "p4lang__p4-spec",
+    "repository": "p4lang/p4-spec",
+    "url": "https://github.com/p4lang/p4-spec.git",
+    "role": "P4 language and architecture specifications",
+    "families": ["specification", "p4_16", "architecture"]
+  },
+  {
+    "id": "p4lang__open-p4studio",
+    "repository": "p4lang/open-p4studio",
+    "url": "https://github.com/p4lang/open-p4studio.git",
+    "role": "Open Tofino/P4Studio examples and target-specific reference programs",
+    "families": ["tofino", "p4_16", "target_examples"]
+  },
+  {
+    "id": "p4lang__p4app",
+    "repository": "p4lang/p4app",
+    "url": "https://github.com/p4lang/p4app.git",
+    "role": "P4 application packaging and runnable examples",
+    "families": ["bmv2", "applications", "examples"]
+  },
+  {
+    "id": "nsg-ethz__p4-learning",
+    "repository": "nsg-ethz/p4-learning",
+    "url": "https://github.com/nsg-ethz/p4-learning.git",
+    "role": "BMv2 examples and exercises covering tables, stateful externs and advanced packet processing",
+    "families": ["bmv2", "examples", "exercises", "p4runtime"],
+    "sparse_paths": ["examples/", "exercises/", "slides/", "README.md"]
+  },
+  {
+    "id": "jafingerhut__p4-guide",
+    "repository": "jafingerhut/p4-guide",
+    "url": "https://github.com/jafingerhut/p4-guide.git",
+    "role": "P4 language, compiler and BMv2 guidance with practical examples",
+    "families": ["p4_16", "bmv2", "guides", "examples"]
+  },
+  {
+    "id": "p4lang__p4-dpdk-target",
+    "repository": "p4lang/p4-dpdk-target",
+    "url": "https://github.com/p4lang/p4-dpdk-target.git",
+    "role": "P4 DPDK target implementation and examples",
+    "families": ["dpdk", "p4_16", "target_examples"]
+  },
+  {
+    "id": "p4lang__p4-applications",
+    "repository": "p4lang/p4-applications",
+    "url": "https://github.com/p4lang/p4-applications.git",
+    "role": "P4 application working-group examples and reference applications",
+    "families": ["applications", "p4_16", "examples"]
+  },
+  {
+    "id": "p4lang__p4app-TCP-INT",
+    "repository": "p4lang/p4app-TCP-INT",
+    "url": "https://github.com/p4lang/p4app-TCP-INT.git",
+    "role": "P4 TCP INT application example",
+    "families": ["applications", "int", "bmv2"]
+  },
+  {
+    "id": "p4lang__p4app-switchML",
+    "repository": "p4lang/p4app-switchML",
+    "url": "https://github.com/p4lang/p4app-switchML.git",
+    "role": "SwitchML P4 application and data-plane example",
+    "families": ["applications", "switchml", "p4_16"]
+  },
+  {
+    "id": "p4lang__p4pi",
+    "repository": "p4lang/p4pi",
+    "url": "https://github.com/p4lang/p4pi.git",
+    "role": "P4 education and Raspberry Pi networking examples",
+    "families": ["education", "examples", "p4_16"]
+  },
+  {
+    "id": "p4lang__p4analyzer",
+    "repository": "p4lang/p4analyzer",
+    "url": "https://github.com/p4lang/p4analyzer.git",
+    "role": "P4 language analyzer and language-server examples",
+    "families": ["analysis", "p4_16", "tools"]
+  },
+  {
+    "id": "p4lang__p4-constraints",
+    "repository": "p4lang/p4-constraints",
+    "url": "https://github.com/p4lang/p4-constraints.git",
+    "role": "P4 runtime constraints and validation material",
+    "families": ["p4runtime", "validation", "specification"]
+  },
+  {
+    "id": "p4lang__p4c-behavioral",
+    "repository": "p4lang/p4c-behavioral",
+    "url": "https://github.com/p4lang/p4c-behavioral.git",
+    "role": "Archived historical behavioral-model compiler; retain for P4_14 provenance only",
+    "families": ["legacy", "p4_14", "bmv2"]
+  },
+  {
+    "id": "p4lang__p4c-bm",
+    "repository": "p4lang/p4c-bm",
+    "url": "https://github.com/p4lang/p4c-bm.git",
+    "role": "Archived historical BMv2 compiler and examples; retain separately from P4_16 data",
+    "families": ["legacy", "p4_14", "bmv2"]
+  },
+  {
+    "id": "p4lang__p4-hlir",
+    "repository": "p4lang/p4-hlir",
+    "url": "https://github.com/p4lang/p4-hlir.git",
+    "role": "Archived historical P4 HLIR implementation and P4_14 material",
+    "families": ["legacy", "p4_14"]
+  }
+]

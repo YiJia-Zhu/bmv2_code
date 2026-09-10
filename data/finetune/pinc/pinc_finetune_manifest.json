@@ -1,0 +1,60 @@
+{
+  "generated_at": "2026-09-10T08:43:10.358142+00:00",
+  "input": "/mnt/8T/xgr/zhuyijia/bmv2_code/data/raw/hf/SFU_p4_dataset/p4_dataset.jsonl",
+  "output_root": "/mnt/8T/xgr/zhuyijia/bmv2_code/data/finetune/pinc",
+  "source_dataset": "SFU-CONNECT/p4_dataset",
+  "source_records_after_dedup": 405,
+  "written_records": {
+    "train": 319,
+    "dev": 40,
+    "test": 40
+  },
+  "repository_counts": {
+    "train": 87,
+    "dev": 12,
+    "test": 13
+  },
+  "written_repository_counts": {
+    "train": 86,
+    "dev": 12,
+    "test": 13
+  },
+  "repository_split": true,
+  "split_seed": 42,
+  "split_ratios": {
+    "train": 0.8,
+    "dev": 0.1,
+    "test": 0.1
+  },
+  "prompt_fields": [
+    "annotation"
+  ],
+  "include_detailed_annotation": false,
+  "tokenizer": "/mnt/8T/xgr/zhuyijia/huggingface_models/Qwen3-14B",
+  "max_seq_len": 16384,
+  "chat_template_token_stats": {
+    "train": {
+      "min": 389,
+      "p50": 1362,
+      "p90": 4166,
+      "max": 13315
+    },
+    "dev": {
+      "min": 436,
+      "p50": 1205,
+      "p90": 3874,
+      "max": 13177
+    },
+    "test": {
+      "min": 816,
+      "p50": 1395,
+      "p90": 4344,
+      "max": 9793
+    }
+  },
+  "dropped_overlength": {
+    "train": 6
+  },
+  "skipped": {},
+  "format": "ShareGPT messages: PINC intent -> complete P4_16 source"
+}

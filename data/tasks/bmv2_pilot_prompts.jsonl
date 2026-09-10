@@ -1,0 +1,3 @@
+{"id":"bmv2_pilot_001","prompt":"你是一名 P4_16/BMv2 v1model 工程师。只输出完整的 main.p4 源码，不要 Markdown。实现 IPv4 目的地址最长前缀匹配转发：解析 Ethernet 和 IPv4，命中表项后设置出口端口和目的 MAC，TTL 减一并重新计算 IPv4 校验和；未命中丢弃。使用 V1Switch，所有表项由测试程序下发，不得使用 PSA、TNA 或 Tofino 专用 extern，必须通过 p4c-bm2-ss --p4v 16。"}
+{"id":"bmv2_pilot_002","prompt":"你是一名 P4_16/BMv2 v1model 工程师。只输出完整的 main.p4 源码，不要 Markdown。实现一个二层学习交换机的数据面：解析 Ethernet，根据目的 MAC 做 exact 匹配并设置 egress_spec，未知目的地址丢弃；允许测试程序下发表项。必须包含完整 parser、ingress、egress、checksum 控制和 deparser，并通过 p4c-bm2-ss --p4v 16。"}
+{"id":"bmv2_pilot_003","prompt":"你是一名 P4_16/BMv2 v1model 工程师。只输出完整的 main.p4 源码，不要 Markdown。解析 Ethernet、IPv4 和 TCP；对 IPv4 目的地址匹配的流量维护一个 register 计数器，每个命中包递增对应索引的计数，并从指定出口端口转发。测试程序会下发表项和读取 register；不得使用非 v1model extern，必须通过 p4c-bm2-ss --p4v 16。"}

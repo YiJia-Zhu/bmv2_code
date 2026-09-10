@@ -1,0 +1,1 @@
+{"id":"bmv2_pilot_003_retry","prompt":"你是一名 P4_16/BMv2 v1model 工程师。只输出完整的 main.p4 源码，不要 Markdown。解析 Ethernet、IPv4 和 TCP；对 IPv4 目的地址匹配的流量维护一个 register 计数器，每个命中包递增对应索引的计数，并从指定出口端口转发。测试程序会下发表项和读取 register；不得使用非 v1model extern，必须通过 p4c-bm2-ss --p4v 16。"}

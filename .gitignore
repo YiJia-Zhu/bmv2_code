@@ -1,0 +1,130 @@
+
+
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+
+# Python caches and local tooling
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.ipynb_checkpoints/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Node dependencies and package-manager caches
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Runtime logs, process state, and local databases
+*.log
+*.pid
+*.lock
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated benchmark, evaluation, and training outputs
+benchmark_runs/
+training_runs/
+outputs/
+results/
+runs/
+checkpoints/
+wandb/
+mlruns/
+tensorboard/
+.trash/
+
+# Model weights and generated model artifacts
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+*.gguf
+*.ggml
+*.p4info
+*.p4i
+
+# Large archives and local downloads
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+
+# Raw source snapshots and collection payloads
+data/raw/repositories/
+data/raw/GHArchive/
+data/raw/hf/**/.cache/
+data/raw/hf/**/individual_files/
+data/raw/hf/**/res/
+
+# Large HF dataset contents. Keep dataset scripts, READMEs, and metadata files.
+data/raw/hf/**/*.json
+data/raw/hf/**/*.jsonl
+data/raw/hf/**/*.csv
+data/raw/hf/**/*.tsv
+data/raw/hf/**/*.parquet
+data/raw/hf/**/*.arrow
+data/raw/hf/**/*.feather
+data/raw/hf/**/*.pkl
+data/raw/hf/**/*.pickle
+data/raw/hf/**/*.npy
+data/raw/hf/**/*.npz
+
+# Supplemental repository overlay is local data; retain its audit metadata.
+data/raw/hf/p4dataset_supplemental/*
+!data/raw/hf/p4dataset_supplemental/README.md
+!data/raw/hf/p4dataset_supplemental/download_manifest.jsonl
+!data/raw/hf/p4dataset_supplemental/download_summary.json
+
+# Generated normalized records and compiler artifacts
+data/normalized/**/*.jsonl
+data/normalized/**/*.json
+data/normalized/**/*.csv
+data/normalized/**/*.tsv
+data/normalized/**/*.parquet
+data/normalized/**/*.arrow
+data/normalized/**/*.feather
+data/normalized/**/*.pkl
+data/normalized/**/*.pickle
+data/normalized/**/*.npy
+data/normalized/**/*.npz
+data/normalized/**/*.txt
+
+# Generated fine-tuning datasets; keep small manifests for reproducibility.
+data/finetune/**/*.jsonl
+data/finetune/**/dataset_info.json
+
+# Automatically generated prompt stress set; reviewed pilot prompts remain trackable.
+data/tasks/bmv2_full_auto_prompts.jsonl
