@@ -10,8 +10,10 @@
 - `data/normalized/` stores JSONL records, compiler stderr, and auditable compile splits.
 - `data/normalized/hf_p4llms/` stores the isolated normalized `p4llms/p4dataset` export.
 - `data/tools/` contains the normalization, BMv2 prefilter, and failure-classification scripts.
+- `data/pipelines/bigquery_gharchive_p4/` is the isolated Plan B repository collector. Treat `pipeline.json` as the canonical machine-readable status/phase record, `collector.py` as the canonical entry point, and `data/raw/gharchive_p4/` as its isolated output root. `data/tools/collect_gharchive_p4.py` is compatibility-only.
 - `data/tools/recover_p4llms_dependencies.py` downloads missing GitHub include/support files into the isolated `data/raw/hf/p4dataset_supplemental/` overlay; `merge_bmv2_repair_results.py` and `build_bmv2_dataset_splits.py` create auditable repaired results and eligibility splits.
-- `benchmark_runs/` is generated output and should not be treated as source.
+- `benchmark_runs/` and `training_smoke/runs/` are generated outputs and should not be treated as source.
+- `training_smoke/` holds isolated Qwen/vLLM/LlamaFactory smoke-test scripts, configs, generated fine-tuning splits, and run outputs separate from the main data-collection tree.
 
 ## Goal and Dataset Gate
 
@@ -35,7 +37,8 @@ The generated `data/tasks/bmv2_full_auto_prompts.jsonl` contains 2,439 provenanc
 
 ## Build and Test Commands
 
-- `python3 -m py_compile bmv2_llm_compile_benchmark.py test_pcl_models.py data/tools/*.py` checks syntax.
+- `python3 -m py_compile bmv2_llm_compile_benchmark.py test_pcl_models.py data/tools/*.py training_smoke/tools/*.py` checks syntax.
+- `python3 -m unittest data/pipelines/bigquery_gharchive_p4/tests/test_collector.py -q` runs the offline Plan B collector tests without network or BigQuery jobs.
 - `python3 data/tools/normalize_dataset.py` refreshes normalized records.
 - `python3 data/tools/compile_bmv2_candidates.py --auto-include --include-path /usr/include` runs the BMv2 prefilter.
 - `python3 data/tools/classify_bmv2_results.py` regenerates the 100%-clean split and failure taxonomy.

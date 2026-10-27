@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "pipeline_id": "bigquery_gharchive_p4",
+  "plan": "B",
+  "status": "ready_for_bounded_dry_run",
+  "objective": "Collect the latest complete GitHub project snapshot only when at least one tracked .p4 file is classified as P4_16.",
+  "entrypoint": "data/pipelines/bigquery_gharchive_p4/collector.py",
+  "compatibility_entrypoint": "data/tools/collect_gharchive_p4.py",
+  "test_entrypoint": "data/pipelines/bigquery_gharchive_p4/tests/test_collector.py",
+  "output_root": "data/raw/gharchive_p4",
+  "credentials": {
+    "bigquery_oauth_token": "data/token.json",
+    "bigquery_client_secret": "data/client_secret_*.json",
+    "github_token_env": [
+      "GITHUB_TOKEN",
+      "GH_TOKEN"
+    ],
+    "commit_credentials": false
+  },
+  "sources": {
+    "primary_file_index": "bigquery-public-data.github_repos.files",
+    "repository_supplement": "GHArchive repository events",
+    "snapshot_source": "GitHub default branch latest commit",
+    "fallback_scope": "Targeted SWH lookup is external to this pipeline"
+  },
+  "admission": {
+    "path_rule": "case-insensitive suffix .p4 on a tracked blob",
+    "repository_gate": "at least one exact p4_16 classification",
+    "reject_statuses": [
+      "p4_14",
+      "unknown",
+      "p4_16_conflicted",
+      "unreadable"
+    ],
+    "low_p4_ratio_kept": true,
+    "payload_order": "tree, P4 gate blobs, then complete repository payload"
+  },
+  "phases": [
+    {
+      "id": "bigquery_dry_run",
+      "network": true,
+      "billable_query": false,
+      "requires_confirmation": true,
+      "command": "python3 data/pipelines/bigquery_gharchive_p4/collector.py discover-bigquery --billing-project ornate-grail-473307-m8 --oauth-token-file data/token.json --execute --dry-run-only --max-bytes-billed 1073741824",
+      "output": "data/raw/gharchive_p4/discovery/bigquery_dry_run.json"
+    },
+    {
+      "id": "bigquery_export",
+      "network": true,
+      "billable_query": true,
+      "requires_confirmation": true,
+      "command": "Remove --dry-run-only from the approved dry-run command and set --max-bytes-billed to the approved estimate ceiling.",
+      "output": "data/raw/gharchive_p4/discovery/bigquery_p4_repositories.jsonl"
+    },
+    {
+      "id": "gharchive_supplement",
+      "network": true,
+      "requires_confirmation": true,
+      "command": "python3 data/pipelines/bigquery_gharchive_p4/collector.py download-gharchive --start-hour YYYY-MM-DD-H --end-hour YYYY-MM-DD-H",
+      "output": "data/raw/gharchive_p4/discovery/gharchive_repositories.jsonl"
+    },
+    {
+      "id": "merge_discovery",
+      "network": false,
+      "command": "python3 data/pipelines/bigquery_gharchive_p4/collector.py merge-discovery --input data/raw/gharchive_p4/discovery/bigquery_p4_repositories.jsonl --input data/raw/gharchive_p4/discovery/gharchive_repositories.jsonl",
+      "output": "data/raw/gharchive_p4/manifests/repositories.jsonl"
+    },
+    {
+      "id": "collect_snapshots",
+      "network": true,
+      "requires_confirmation": true,
+      "command": "python3 data/pipelines/bigquery_gharchive_p4/collector.py collect-snapshots --repositories data/raw/gharchive_p4/manifests/repositories.jsonl --limit 20",
+      "output": "data/raw/gharchive_p4/snapshots"
+    },
+    {
+      "id": "build_context",
+      "network": false,
+      "command": "python3 data/pipelines/bigquery_gharchive_p4/collector.py build-context",
+      "output": "data/raw/gharchive_p4/derived/p4_context"
+    }
+  ],
+  "safety": {
+    "start_with_dry_run": true,
+    "require_max_bytes_billed": true,
+    "start_snapshot_limit": 20,
+    "network_jobs_started": false,
+    "bigquery_jobs_started_in_setup": false
+  },
+  "coverage_limit": "Not equivalent to a full Software Heritage Graph scan; deleted repositories absent from candidate sources may be missed."
+}

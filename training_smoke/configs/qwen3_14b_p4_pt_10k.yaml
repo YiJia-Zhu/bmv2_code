@@ -1,0 +1,56 @@
+# LlamaFactory continued-pretraining configuration.
+# Generate training_smoke/data/finetune/p4llms_p4_code_{train,dev}.jsonl first.
+model_name_or_path: /mnt/8T/xgr/zhuyijia/huggingface_models/Qwen3-14B
+
+stage: pt
+do_train: true
+do_eval: true
+finetuning_type: lora
+
+dataset_dir: training_smoke/data/finetune
+dataset: p4llms_p4_code_train
+eval_dataset: p4llms_p4_code_dev
+cutoff_len: 10240
+packing: false
+preprocessing_num_workers: 16
+
+quantization_bit: 4
+quantization_method: bnb
+quantization_type: nf4
+double_quantization: true
+lora_rank: 8
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target: all
+
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 1.0e-4
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+weight_decay: 0.01
+optim: paged_adamw_8bit
+
+bf16: true
+fp16: false
+gradient_checkpointing: true
+flash_attn: fa2
+
+logging_strategy: steps
+logging_steps: 10
+logging_dir: training_smoke/runs/training_runs/qwen3_14b_p4_pt_10k/tensorboard
+report_to: tensorboard
+plot_loss: true
+
+eval_strategy: steps
+eval_steps: 200
+save_strategy: steps
+save_steps: 200
+save_total_limit: 3
+seed: 42
+ddp_timeout: 180000000
+
+output_dir: training_smoke/runs/training_runs/qwen3_14b_p4_pt_10k
+overwrite_output_dir: true

@@ -5,6 +5,8 @@
 .env
 .env.*
 !.env.example
+data/token.json
+data/client_secret_*.json
 
 
 # Python caches and local tooling
@@ -53,6 +55,7 @@ Thumbs.db
 # Generated benchmark, evaluation, and training outputs
 benchmark_runs/
 training_runs/
+training_smoke/runs/
 outputs/
 results/
 runs/
@@ -83,7 +86,12 @@ tensorboard/
 *.rar
 
 # Raw source snapshots and collection payloads
+/data/raw/
+/data/normalized/
+/data/finetune/
+/training_smoke/data/
 data/raw/repositories/
+data/raw/swh_p4/content_screen/
 data/raw/GHArchive/
 data/raw/hf/**/.cache/
 data/raw/hf/**/individual_files/
@@ -125,6 +133,8 @@ data/normalized/**/*.txt
 # Generated fine-tuning datasets; keep small manifests for reproducibility.
 data/finetune/**/*.jsonl
 data/finetune/**/dataset_info.json
+training_smoke/data/**/*.jsonl
+training_smoke/data/**/dataset_info.json
 
 # Automatically generated prompt stress set; reviewed pilot prompts remain trackable.
 data/tasks/bmv2_full_auto_prompts.jsonl

@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListSwhGraph20260604Orc",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::softwareheritage",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "graph/2026-06-04/orc",
+            "graph/2026-06-04/orc/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ReadSwhGraph20260604Orc",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::softwareheritage/graph/2026-06-04/orc/*"
+    }
+  ]
+}

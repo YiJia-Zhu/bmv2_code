@@ -1,0 +1,17 @@
+[package]
+name = "swh-p4-graph-reader"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow = "1.0"
+dsi-bitstream = "=0.7.0"
+memmap2 = "0.9"
+ph = "=0.11.0"
+serde_json = "1.0"
+webgraph = "=0.6.0"
+
+[profile.release]
+debug = 0
+
