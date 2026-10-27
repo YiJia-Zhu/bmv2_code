@@ -86,7 +86,7 @@ tensorboard/
 *.rar
 
 # Raw source snapshots and collection payloads
-/data/raw/
+/data/raw/*
 /data/normalized/
 /data/finetune/
 /training_smoke/data/
@@ -138,3 +138,17 @@ training_smoke/data/**/dataset_info.json
 
 # Automatically generated prompt stress set; reviewed pilot prompts remain trackable.
 data/tasks/bmv2_full_auto_prompts.jsonl
+
+# Four-machine history handoff: publish launch code, never its downloaded state.
+!/data/raw/repositories/
+/data/raw/repositories/*
+!/data/raw/repositories/swh_full_history_shards/
+/data/raw/repositories/swh_full_history_shards/*
+!/data/raw/repositories/swh_full_history_shards/README.md
+!/data/raw/repositories/swh_full_history_shards/split_manifest.json
+!/data/raw/repositories/swh_full_history_shards/shard_[0-3]/
+/data/raw/repositories/swh_full_history_shards/shard_[0-3]/*
+!/data/raw/repositories/swh_full_history_shards/shard_[0-3]/run.sh
+!/data/raw/repositories/swh_full_history_shards/shard_[0-3]/collector/
+/data/raw/repositories/swh_full_history_shards/shard_[0-3]/collector/*
+!/data/raw/repositories/swh_full_history_shards/shard_[0-3]/collector/*.py

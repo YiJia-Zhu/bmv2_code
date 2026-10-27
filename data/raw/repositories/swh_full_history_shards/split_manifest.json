@@ -1,0 +1,81 @@
+{
+  "created_at": "2026-10-27T09:45:45.333180+00:00",
+  "input_sha256": "9a5939cbd9b3d42d485df9c59dffd4abe96ada3ace51b4437d7ba76fd7197e67",
+  "shard_count": 4,
+  "shards": [
+    {
+      "api_complete": 107,
+      "api_tasks": 12637,
+      "assets": 65,
+      "assets_complete": 26,
+      "bundled_git_helper": true,
+      "directory": "shard_0",
+      "git_complete": 66,
+      "origins": 2482,
+      "packages": 22,
+      "pending": {
+        "api": 12530,
+        "assets": 39,
+        "git": 2392,
+        "packages": 0
+      },
+      "repos": 2458
+    },
+    {
+      "api_complete": 86,
+      "api_tasks": 13337,
+      "assets": 3140,
+      "assets_complete": 1992,
+      "bundled_git_helper": true,
+      "directory": "shard_1",
+      "git_complete": 68,
+      "origins": 2627,
+      "packages": 22,
+      "pending": {
+        "api": 13251,
+        "assets": 1148,
+        "git": 2525,
+        "packages": 0
+      },
+      "repos": 2593
+    },
+    {
+      "api_complete": 77,
+      "api_tasks": 12755,
+      "assets": 277,
+      "assets_complete": 180,
+      "bundled_git_helper": true,
+      "directory": "shard_2",
+      "git_complete": 71,
+      "origins": 2587,
+      "packages": 27,
+      "pending": {
+        "api": 12678,
+        "assets": 97,
+        "git": 2480,
+        "packages": 0
+      },
+      "repos": 2551
+    },
+    {
+      "api_complete": 102,
+      "api_tasks": 12346,
+      "assets": 225,
+      "assets_complete": 172,
+      "bundled_git_helper": true,
+      "directory": "shard_3",
+      "git_complete": 67,
+      "origins": 2505,
+      "packages": 25,
+      "pending": {
+        "api": 12244,
+        "assets": 53,
+        "git": 2400,
+        "packages": 0
+      },
+      "repos": 2467
+    }
+  ],
+  "source": "/mnt/8T/xgr/zhuyijia/bmv2_code/data/raw/repositories/swh_full_history",
+  "source_status_at": "2026-10-27T09:38:08.749321+00:00"
+}
