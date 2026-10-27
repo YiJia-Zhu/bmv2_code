@@ -1,10 +1,12 @@
 # 四机下载交接
 
-GitHub 仓库包含每个分片的 `run.sh`、`collector/*.py`、本说明和
-`split_manifest.json`。`input.csv`、SQLite 检查点、已下载的 Git 镜像、
-API 页面、归档和本地 Git helper 被 `.gitignore` 排除。仅克隆 GitHub
-仓库无法恢复原有进度；仍须从原机器复制对应 `shard_i/` 的完整数据，
-或在目标机器用同一输入 CSV 初始化新的分片任务。
+GitHub 仓库包含每个分片的 `run.sh`、`collector/*.py`、`input.csv`、
+本说明和 `split_manifest.json`。四份 `input.csv` 内容相同，是约
+2.8 MB 的任务清单，不含源码。SQLite 检查点、已下载的 Git 镜像、
+API 页面、归档和本地 Git helper 仍被 `.gitignore` 排除。仅克隆 GitHub
+仓库无法恢复原有进度；仍须从原机器复制对应 `shard_i/` 的检查点及
+已下载数据。若没有检查点，收集器会从头处理该分片，包括已完成的仓库。
+`run.sh` 会在缺少检查点时直接退出，防止误启动。
 
 原收集器于 2026-10-27 09:38:08 UTC 正常停止（`final=true`），原始目录
 `../swh_full_history/` 保留不变。四份检查点对应相同输入 CSV 的

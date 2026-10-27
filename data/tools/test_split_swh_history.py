@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from split_swh_history import prepare
+from split_swh_history import prepare, write_runner
 from swh_history_common import State, atomic_json, stable_id
 
 
@@ -118,6 +118,17 @@ class SplitHistoryTests(unittest.TestCase):
             atomic_json(source / "status.json", {"final": False})
             with self.assertRaises(ValueError):
                 prepare(source, root / "shards")
+
+    def test_runner_requires_checkpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_runner(root, 2, 4)
+            (root / "input.csv").write_text("origin_id,origin_url\n")
+            result = subprocess.run(["bash", str(root / "run.sh")],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    universal_newlines=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("manifests/state.sqlite3", result.stderr)
 
 
 if __name__ == "__main__":

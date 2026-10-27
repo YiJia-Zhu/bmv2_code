@@ -1,0 +1,2 @@
+# The shard input must retain its original CRLF bytes for checkpoint identity.
+data/raw/repositories/swh_full_history_shards/shard_[0-3]/input.csv -text whitespace=cr-at-eol
