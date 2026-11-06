@@ -30,7 +30,10 @@ def main():
             print("Mirrors={:.3f} GiB; commits={:,}; local payload growth={} MiB/s; free={} GiB".format(
                 record["mirror_bytes"] / 1024 ** 3, record["reachable_commits"],
                 record["local_payload_growth_mib_s"], record["free_gib"]))
-            print("API: {} (total pages still being discovered; ETA unknown)".format(record["api_status"]))
+            print("API: {}; active={}; pages/min={}; current queue ETA~{} "
+                  "(newly discovered pages can extend ETA)".format(
+                      record["api_status"], record.get("api_active", "unknown"),
+                      record.get("api_pages_per_min", "unknown"), duration(record.get("api_eta_s"))))
             print("Non-Git: {}; archives: {}".format(record["non_git_status"], record["asset_status"]))
             print("Per-host Git concurrency: {}".format(record["host_limits"]))
             print("Stopped/final: {}; reason: {}".format(record["final"], record["pause_reason"]))

@@ -189,10 +189,13 @@ class State:
             for row in self.rows("SELECT * FROM origins ORDER BY origin_id"):
                 output.write(json.dumps(row) + "\n")
 
-    def recover(self):
+    def recover(self, api_only=False):
         # The process lock must be held before reclaiming interrupted work.
-        for table in ("repos", "api_tasks", "packages", "assets"):
+        tables = ("api_tasks",) if api_only else ("repos", "api_tasks", "packages", "assets")
+        for table in tables:
             self.execute("UPDATE {} SET status='retry_wait',attempts=MAX(0,attempts-1),next_at=0 WHERE status='running'".format(table))
+        if api_only:
+            return
         # An interruption after mirror verification can leave LFS/index auxiliaries
         # unfinished. Reuse the existing object database instead of dropping it.
         self.execute("""UPDATE repos SET status='retry_wait',next_at=0

@@ -7,7 +7,7 @@ for REQUIRED in input.csv manifests/state.sqlite3; do
     exit 2
   fi
 done
-python3 -u "$ROOT/collector/download_swh_history.py" \
+exec python3 -u "$ROOT/collector/download_swh_history.py" \
   --input "$ROOT/input.csv" --output "$ROOT" \
   --shard-count 4 --shard-index 2 \
   --proxy "${SWH_HISTORY_PROXY:-}" \

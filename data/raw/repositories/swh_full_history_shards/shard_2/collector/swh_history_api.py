@@ -42,7 +42,7 @@ class API:
         self.github_token_fingerprint = None
 
     def refresh_credentials(self):
-        token = self.token("GITHUB_TOKEN", "GH_TOKEN")
+        token = self.token("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_API_TOKEN")
         fingerprint = stable_id(token) if token else "anonymous"
         with self.lock:
             previous = self.github_token_fingerprint
@@ -72,7 +72,7 @@ class API:
                    "Accept": "application/json"}
         token = None
         if parsed.hostname == "api.github.com":
-            token = self.token("GITHUB_TOKEN", "GH_TOKEN")
+            token = self.token("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_API_TOKEN")
             headers["Accept"] = "application/vnd.github+json"
             headers["X-GitHub-Api-Version"] = "2022-11-28"
             if token:

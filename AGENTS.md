@@ -15,6 +15,12 @@
 - `benchmark_runs/` and `training_smoke/runs/` are generated outputs and should not be treated as source.
 - `training_smoke/` holds isolated Qwen/vLLM/LlamaFactory smoke-test scripts, configs, generated fine-tuning splits, and run outputs separate from the main data-collection tree.
 
+## Current Collection Plans
+
+- `TODO_code.md` is the root-level P4 code-collection plan, moved from `data/raw/swh_p4/TODO.md`. Read it for the latest written progress and next steps; detailed SWH run evidence remains under `data/raw/swh_p4/`. Check live manifests and checkpoints before assuming a running job has finished.
+- `TODO_text.md` is the separate plan for P4 documentation knowledge after code collection. Its current scope is P4 specifications, official tutorials and tool documentation, papers, and targeted web sources. No bulk text collection has started.
+- Keep code and documentation raw sources and training views separate. A discovered `.p4` path or static P4_16 candidate is not a confirmed P4_16 repository or a document count.
+
 ## Goal and Dataset Gate
 
 The project compares BMv2 P4 compile-through rates across local and PCL models. Start with a reviewed 30-task pilot, validate the harness, then freeze a 300-task benchmark. Each task needs a stable ID, bilingual prompt variants, an author-verified `main.p4`, required-feature metadata, and source or generation provenance. Split by semantic family to prevent near-duplicate leakage, and keep pretraining, supervised, and benchmark data separate.

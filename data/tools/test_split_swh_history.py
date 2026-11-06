@@ -82,8 +82,13 @@ class SplitHistoryTests(unittest.TestCase):
                 self.assertTrue(all(int(repo_id, 16) % 4 == index for repo_id in repo_ids))
                 self.assertTrue((shard / "run.sh").exists())
                 subprocess.run(["bash", "-n", str(shard / "run.sh")], check=True)
+                runner = (shard / "run.sh").read_text()
+                self.assertIn('PROJECT_ROOT="$(cd -- "$ROOT/../../../../.." && pwd)"', runner)
+                self.assertIn('${SWH_HISTORY_ENV_FILE:-$PROJECT_ROOT/.env}', runner)
                 subprocess.run(["python3", str(shard / "collector/download_swh_history.py"),
                                 "--help"], check=True, stdout=subprocess.DEVNULL)
+                self.assertIn('"GITHUB_API_TOKEN"',
+                              (shard / "collector/swh_history_api.py").read_text())
                 db.close()
                 resume = State(shard)
                 resume.import_input(shard / "input.csv", index, 4)

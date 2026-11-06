@@ -31,9 +31,12 @@ class StripAuthRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class API:
-    def __init__(self, state, proxy, env_file):
+    def __init__(self, state, proxy, env_file, github_requests_per_hour=3000):
+        if not 1 <= github_requests_per_hour <= 5000:
+            raise ValueError("GitHub API rate must be between 1 and 5000 requests/hour")
         self.state = state
         self.env_file = Path(env_file)
+        self.github_requests_per_hour = github_requests_per_hour
         handlers = [StripAuthRedirect(), urllib.request.ProxyHandler(
             {"http": proxy, "https": proxy} if proxy else {})]
         self.opener = urllib.request.build_opener(*handlers)
@@ -42,7 +45,7 @@ class API:
         self.github_token_fingerprint = None
 
     def refresh_credentials(self):
-        token = self.token("GITHUB_TOKEN", "GH_TOKEN")
+        token = self.github_token()
         fingerprint = stable_id(token) if token else "anonymous"
         with self.lock:
             previous = self.github_token_fingerprint
@@ -54,6 +57,9 @@ class API:
                 self.state.execute("""UPDATE api_tasks SET status='pending',next_at=0,attempts=0
                     WHERE host='github.com' AND status IN ('unavailable_http_401','unavailable_http_403')""")
                 self.state.event("github_credentials_changed", authenticated=bool(token))
+
+    def github_token(self):
+        return self.token("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_API_TOKEN")
 
     def token(self, *keys):
         # Reload selected keys only: adding a token does not require restarting.
@@ -72,7 +78,7 @@ class API:
                    "Accept": "application/json"}
         token = None
         if parsed.hostname == "api.github.com":
-            token = self.token("GITHUB_TOKEN", "GH_TOKEN")
+            token = self.github_token()
             headers["Accept"] = "application/vnd.github+json"
             headers["X-GitHub-Api-Version"] = "2022-11-28"
             if token:
@@ -86,7 +92,10 @@ class API:
             delay = self.next_at.get(host, 0) - time.time()
             if delay > 0:
                 raise RetryRequest("host_quota_wait", delay)
-            self.next_at[host] = time.time() + (1.2 if token else 2.0)
+            interval = 1.2 if token else 2.0
+            if parsed.hostname == "api.github.com" and token:
+                interval = 3600.0 / self.github_requests_per_hour
+            self.next_at[host] = time.time() + interval
         try:
             with self.opener.open(urllib.request.Request(url, headers=headers), timeout=60) as response:
                 raw = response.read()
@@ -100,7 +109,8 @@ class API:
                                            "x-ratelimit-limit", "retry-after")}
                 if response.headers.get("X-RateLimit-Remaining") == "0":
                     with self.lock:
-                        self.next_at[host] = float(response.headers.get("X-RateLimit-Reset", time.time() + 3600)) + 3
+                        self.next_at[host] = max(self.next_at.get(host, 0),
+                                                 float(response.headers.get("X-RateLimit-Reset", time.time() + 3600)) + 3)
                 return json.loads(raw), {"headers": meta, "url": response.geturl(),
                                          "fetched_at": utc_now(), "http_status": response.status}
         except urllib.error.HTTPError as exc:
@@ -116,7 +126,7 @@ class API:
                 reset = float(exc.headers.get("X-RateLimit-Reset", "0")) - time.time() + 3
                 retry = max(retry, reset, 60)
                 with self.lock:
-                    self.next_at[host] = time.time() + retry
+                    self.next_at[host] = max(self.next_at.get(host, 0), time.time() + retry)
                 raise RetryRequest("HTTP {} rate_limited".format(exc.code), retry)
             raise
 

@@ -56,6 +56,9 @@ def tail(path, size=8192):
 class Collector:
     def __init__(self, args):
         self.args = args
+        self.api_only = getattr(args, "api_only", False)
+        self.github_api_rph = getattr(args, "github_api_rph", 3000)
+        self.github_api_concurrency = getattr(args, "github_api_concurrency", 1)
         self.root = args.output.resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.process_lock = (self.root / "collector.lock").open("a")
@@ -64,7 +67,7 @@ class Collector:
         self.process_lock.flush()
         self.state = State(self.root)
         self.state.import_input(args.input, args.shard_index, args.shard_count)
-        self.state.recover()
+        self.state.recover(api_only=self.api_only)
         self.stop = threading.Event()
         self.pause_reason = None
         self.start = time.time()
@@ -80,7 +83,8 @@ class Collector:
                 if previous_value:
                     self.first_start = datetime.datetime.fromisoformat(previous_value).timestamp()
             self.state.execute("INSERT INTO metadata VALUES ('first_started_epoch', ?)", (str(self.first_start),))
-        self.api = API(self.state, args.proxy, args.env_file)
+        self.api = API(self.state, args.proxy, args.env_file,
+                       github_requests_per_hour=self.github_api_rph)
         # Tracker discovery does not require a successful Git clone first.
         with self.state.batch():
             for repo in self.state.rows("SELECT * FROM repos"):
@@ -113,7 +117,10 @@ class Collector:
             "global_git_max": args.git_max, "github_start": args.github_start,
             "github_max": args.github_max, "min_free_gib": args.min_free_gib,
             "shard_index": args.shard_index, "shard_count": args.shard_count,
-            "github_authenticated": bool(self.api.token("GITHUB_TOKEN", "GH_TOKEN")),
+            "github_authenticated": bool(self.api.github_token()),
+            "env_file": str(args.env_file.resolve()), "api_only": self.api_only,
+            "github_api_rph": self.github_api_rph,
+            "github_api_concurrency": self.github_api_concurrency,
             "git_exec_path": self.git_env.get("GIT_EXEC_PATH"),
             "completion_scope": "mirror, index, LFS, submodule dependencies, API endpoints tracked independently",
         })
@@ -311,6 +318,13 @@ class Collector:
         failed = statuses.get("failed", 0)
         terminal = done + inaccessible + failed
         process_elapsed = now - self.start
+        api_complete = api_status.get("complete", 0)
+        if not hasattr(self, "baseline_api_complete"):
+            self.baseline_api_complete = api_complete
+        api_completed_this_run = max(0, api_complete - self.baseline_api_complete)
+        api_rate = api_completed_this_run / process_elapsed if process_elapsed else 0
+        api_remaining = sum(api_status.get(status, 0) for status in ("pending", "retry_wait", "running"))
+        api_eta = api_remaining / api_rate if api_completed_this_run >= 10 and process_elapsed >= 30 else None
         elapsed = now - self.first_start
         baseline = getattr(self, "baseline_terminal", terminal)
         self.baseline_terminal = baseline
@@ -356,8 +370,16 @@ class Collector:
             "active_object_bytes": active_bytes, "completed_archive_bytes": archive_bytes,
             "local_payload_growth_mib_s": round(growth_rate / 1024 ** 2, 3),
             "throughput_note": "local object/archive growth, not measured wire traffic; per-repo fetch.log contains Git transfer rates",
-            "api_status": api_status, "api_eta_s": None,
-            "api_eta_note": "total pages expand during discovery; quota waits separate from Git ETA",
+            "api_only": self.api_only, "api_status": api_status,
+            "api_active": getattr(self, "api_active", 0),
+            "api_completed_this_run": api_completed_this_run,
+            "api_pages_per_min": round(api_rate * 60, 2),
+            "api_queue_remaining": api_remaining,
+            "api_eta_s": round(api_eta) if api_eta is not None else None,
+            "api_eta_note": "estimate for current discovered queue; new child pages and quota waits can extend it",
+            "github_api_rph": self.github_api_rph,
+            "github_api_concurrency": self.github_api_concurrency,
+            "github_authenticated": bool(self.api.github_token()),
             "git_eta_s": round(eta) if eta is not None else None,
             "git_eta_note": "rough GitHub observed processed rate since first start; excludes tracker and long tail; may change greatly",
             "git_repos_per_min": round(rate * 60, 2),
@@ -377,13 +399,25 @@ class Collector:
         atomic_json(self.root / "status.json", record)
         text = ("[{at}] Git {terminal}/{total} ({pct:.2f}%) verified={done} inaccessible={unavailable} failed={failed} "
                 "active={active} mirror={gib:.3f}GiB disk_growth={speed:.2f}MiB/s commits={commits} elapsed={elapsed} Git_ETA~{eta} "
-                "API={api} free={free}GiB limits={limits}").format(
+                "API={api} API_active={api_active} API_pages/min={api_rate:.2f} API_queue_ETA~{api_eta} "
+                "free={free}GiB limits={limits}").format(
                     at=record["updated_at"], terminal=terminal, total=totals["total"], pct=record["git_progress_percent"],
                     done=done, unavailable=inaccessible, failed=failed, active=len(active),
                     gib=totals["bytes"] / 1024 ** 3, commits=totals["commits"],
                     speed=growth_rate / 1024 ** 2,
                     elapsed=duration(elapsed), eta=duration(eta), api=api_status,
+                    api_active=record["api_active"], api_rate=record["api_pages_per_min"],
+                    api_eta=duration(api_eta),
                     free=record["free_gib"], limits=dict(self.host_limits))
+        if self.api_only:
+            text = ("[{at}] API_only completed={completed} pending={pending} retry_wait={retry_wait} "
+                    "active={active} new_pages={new_pages} pages/min={rate:.2f} elapsed={elapsed} "
+                    "queue_ETA~{eta} free={free}GiB status={status}").format(
+                        at=record["updated_at"], completed=api_complete,
+                        pending=api_status.get("pending", 0), retry_wait=api_status.get("retry_wait", 0),
+                        active=record["api_active"], new_pages=api_completed_this_run,
+                        rate=record["api_pages_per_min"], elapsed=duration(process_elapsed),
+                        eta=duration(api_eta), free=record["free_gib"], status=api_status)
         print(text, flush=True)
         self.state.event("progress", **{key: value for key, value in record.items() if key not in ("hosts", "active_repositories")})
 
@@ -398,6 +432,11 @@ class Collector:
         jobs = {}
         last_report, last_adjust = 0, time.time()
         try:
+            print("[{}] mode={} GitHub_API_authenticated={} GitHub_API_limit={}/hour "
+                  "GitHub_API_concurrency={} env_file={}".format(
+                      utc_now(), "api_only" if self.api_only else "all_lanes",
+                      bool(self.api.github_token()), self.github_api_rph,
+                      self.github_api_concurrency, self.args.env_file.resolve()), flush=True)
             self.report()
             while not self.stop.is_set():
                 self.check_space()
@@ -422,7 +461,7 @@ class Collector:
                                 self.host_pause[row["host"]] = time.time() + 600
                 counts = collections.Counter(lane for lane, row in jobs.values())
                 host_active = collections.Counter(row["host"] for lane, row in jobs.values() if lane == "git")
-                if counts["git"] < self.args.git_max:
+                if not self.api_only and counts["git"] < self.args.git_max:
                     candidates = self.state.rows("""SELECT * FROM (
                         SELECT *,ROW_NUMBER() OVER (PARTITION BY host ORDER BY
                             CASE WHEN status='retry_wait' THEN 0 ELSE 1 END,next_at,attempts,repo_id) priority
@@ -452,25 +491,33 @@ class Collector:
                                 break
                         if not advanced:
                             break
-                api_active = {urllib.parse.urlsplit(row["url"]).netloc for lane, row in jobs.values() if lane == "api"}
+                api_active = collections.Counter(urllib.parse.urlsplit(row["url"]).netloc
+                                                 for lane, row in jobs.values() if lane == "api")
+                scheduled_api_hosts = set()
                 if counts["api"] < 8:
                     for row in self.state.rows("""SELECT * FROM (
                         SELECT *,ROW_NUMBER() OVER (PARTITION BY host ORDER BY attempts,task_id) priority
                         FROM api_tasks WHERE status IN ('pending','retry_wait') AND next_at<=?)
                         WHERE priority<=4 ORDER BY priority,host""", (time.time(),)):
                         api_host = urllib.parse.urlsplit(row["url"]).netloc
-                        if api_host in api_active or self.api.next_at.get(api_host, 0) > time.time():
+                        host_limit = self.github_api_concurrency if api_host == "api.github.com" else 1
+                        if (api_active[api_host] >= host_limit or api_host in scheduled_api_hosts or
+                                self.api.next_at.get(api_host, 0) > time.time()):
                             continue
                         row["attempts"] += 1
                         self.state.execute("UPDATE api_tasks SET status='running',attempts=? WHERE task_id=?", (row["attempts"], row["task_id"]))
                         jobs[pools["api"].submit(self.api.run_task, row)] = ("api", row)
-                        api_active.add(api_host)
+                        api_active[api_host] += 1
+                        # The worker reserves its request slot under API.lock.
+                        # Admit one task per host each tick to avoid racing that reservation.
+                        scheduled_api_hosts.add(api_host)
                         counts["api"] += 1
                         if counts["api"] >= 8:
                             break
+                self.api_active = counts["api"]
                 for lane, table, key, limit, method in (("package", "packages", "origin_id", 2, packages.resolve),
                                                         ("asset", "assets", "asset_id", 4, packages.download)):
-                    if counts[lane] >= limit:
+                    if self.api_only or counts[lane] >= limit:
                         continue
                     for row in self.state.rows("SELECT * FROM {} WHERE status IN ('pending','retry_wait') AND next_at<=? ORDER BY attempts LIMIT ?".format(table), (time.time(), limit - counts[lane])):
                         row["attempts"] += 1
@@ -497,18 +544,20 @@ class Collector:
                 if time.time() - last_report >= self.args.report_seconds:
                     self.report()
                     last_report = time.time()
+                tracked_tables = ("api_tasks",) if self.api_only else ("repos", "api_tasks", "packages", "assets")
                 pending = sum(self.state.rows("SELECT COUNT(*) n FROM {} WHERE status IN ('pending','retry_wait','running')".format(table))[0]["n"]
-                              for table in ("repos", "api_tasks", "packages", "assets"))
+                              for table in tracked_tables)
                 if not pending and not jobs:
                     self.pause_reason = "queues_processed_review_gaps"
                     break
-                self.stop.wait(1)
+                self.stop.wait(0.1 if self.api_only or self.github_api_concurrency > 1 else 1)
         except Paused:
             pass
         finally:
             self.stop.set()
             for pool in pools.values():
                 pool.shutdown(wait=True)
+            self.api_active = 0
             self.report(final=True)
             self.state.event("run_stopped", reason=self.pause_reason or "user_stop")
 
@@ -528,6 +577,11 @@ def main():
     parser.add_argument("--git-max", type=int, default=48)
     parser.add_argument("--github-start", type=int, default=8)
     parser.add_argument("--github-max", type=int, default=32)
+    parser.add_argument("--api-only", action="store_true", help="resume collaboration API pages only")
+    parser.add_argument("--github-api-rph", type=int, default=3000,
+                        help="authenticated GitHub API request starts/hour, paced across workers (1..5000)")
+    parser.add_argument("--github-api-concurrency", type=int, default=1,
+                        help="simultaneous GitHub API requests, independent of Git workers (1..8)")
     parser.add_argument("--min-free-gib", type=float, default=100)
     parser.add_argument("--retries", type=int, default=5)
     parser.add_argument("--report-seconds", type=int, default=30)
@@ -538,6 +592,8 @@ def main():
         parser.error("require 0 <= shard-index < shard-count")
     if not 1 <= args.github_start <= args.github_max <= args.git_max:
         parser.error("require 1 <= github-start <= github-max <= git-max")
+    if not 1 <= args.github_api_rph <= 5000 or not 1 <= args.github_api_concurrency <= 8:
+        parser.error("require 1 <= github-api-rph <= 5000 and 1 <= github-api-concurrency <= 8")
     collector = Collector(args)
     def stop_handler(number, frame):
         collector.pause_reason = "signal_{}".format(number)

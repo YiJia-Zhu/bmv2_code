@@ -56,6 +56,7 @@ def tail(path, size=8192):
 class Collector:
     def __init__(self, args):
         self.args = args
+        self.api_only = getattr(args, "api_only", False)
         self.root = args.output.resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.process_lock = (self.root / "collector.lock").open("a")
@@ -64,7 +65,7 @@ class Collector:
         self.process_lock.flush()
         self.state = State(self.root)
         self.state.import_input(args.input, args.shard_index, args.shard_count)
-        self.state.recover()
+        self.state.recover(api_only=self.api_only)
         self.stop = threading.Event()
         self.pause_reason = None
         self.start = time.time()
@@ -113,7 +114,7 @@ class Collector:
             "global_git_max": args.git_max, "github_start": args.github_start,
             "github_max": args.github_max, "min_free_gib": args.min_free_gib,
             "shard_index": args.shard_index, "shard_count": args.shard_count,
-            "github_authenticated": bool(self.api.token("GITHUB_TOKEN", "GH_TOKEN")),
+            "github_authenticated": bool(self.api.github_token()),
             "git_exec_path": self.git_env.get("GIT_EXEC_PATH"),
             "completion_scope": "mirror, index, LFS, submodule dependencies, API endpoints tracked independently",
         })
@@ -422,7 +423,7 @@ class Collector:
                                 self.host_pause[row["host"]] = time.time() + 600
                 counts = collections.Counter(lane for lane, row in jobs.values())
                 host_active = collections.Counter(row["host"] for lane, row in jobs.values() if lane == "git")
-                if counts["git"] < self.args.git_max:
+                if not self.api_only and counts["git"] < self.args.git_max:
                     candidates = self.state.rows("""SELECT * FROM (
                         SELECT *,ROW_NUMBER() OVER (PARTITION BY host ORDER BY
                             CASE WHEN status='retry_wait' THEN 0 ELSE 1 END,next_at,attempts,repo_id) priority
@@ -470,7 +471,7 @@ class Collector:
                             break
                 for lane, table, key, limit, method in (("package", "packages", "origin_id", 2, packages.resolve),
                                                         ("asset", "assets", "asset_id", 4, packages.download)):
-                    if counts[lane] >= limit:
+                    if self.api_only or counts[lane] >= limit:
                         continue
                     for row in self.state.rows("SELECT * FROM {} WHERE status IN ('pending','retry_wait') AND next_at<=? ORDER BY attempts LIMIT ?".format(table), (time.time(), limit - counts[lane])):
                         row["attempts"] += 1
@@ -497,8 +498,9 @@ class Collector:
                 if time.time() - last_report >= self.args.report_seconds:
                     self.report()
                     last_report = time.time()
+                tracked_tables = ("api_tasks",) if self.api_only else ("repos", "api_tasks", "packages", "assets")
                 pending = sum(self.state.rows("SELECT COUNT(*) n FROM {} WHERE status IN ('pending','retry_wait','running')".format(table))[0]["n"]
-                              for table in ("repos", "api_tasks", "packages", "assets"))
+                              for table in tracked_tables)
                 if not pending and not jobs:
                     self.pause_reason = "queues_processed_review_gaps"
                     break
@@ -528,6 +530,7 @@ def main():
     parser.add_argument("--git-max", type=int, default=48)
     parser.add_argument("--github-start", type=int, default=8)
     parser.add_argument("--github-max", type=int, default=32)
+    parser.add_argument("--api-only", action="store_true", help="resume collaboration API pages only")
     parser.add_argument("--min-free-gib", type=float, default=100)
     parser.add_argument("--retries", type=int, default=5)
     parser.add_argument("--report-seconds", type=int, default=30)

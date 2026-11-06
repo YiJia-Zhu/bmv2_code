@@ -1,5 +1,52 @@
 # 四机下载交接
 
+## 初轮结果（2026-11-05 核对）
+
+四份本地 `manifests/state.sqlite3` 和 `status.json` 均已停止，
+`final=true`、`pause_reason=queues_processed_review_gaps`；最后一个分片
+于 2026-11-03 09:50:13 UTC 更新。10,069 个 Git 目标中，9,250 个
+bare mirror 已校验完成、201 个 `failed`、618 个 `inaccessible`。
+成功镜像的逐仓库可达 commit 计数合计 17,738,711，镜像字节数合计
+584,468,607,659；fork 间的 commit 可能重复，字节数不是网络流量。
+
+初轮 API 页任务 352,497 个 `complete`，392 个 `failed`；重排前 HTTP
+401/403/404/410/422 分别为 1,048/9/2,995/30/4 个终态；
+归档对象 3,665 个 `complete`、42 个 `failed`。`gitlab.com` 的
+920 个旧 401 已于 2026-11-05 重排为 `pending`，等待手动启动 API 补抓。
+已完成镜像与 API 页不等于原站不可访问历史、LFS 和外部子模块均已收齐。
+逐阶段统计见 `../../swh_p4/RESULTS_SUMMARY_20261022.md`；
+下一步见 `../../../../TODO_code.md`。
+
+### 补抓 gitlab.com 旧 401
+
+2026-11-05 已在四个分片停止时执行过一次 `--apply`，并为每个分片
+生成 `manifests/state.before_gitlab_401_20261105T093908Z.sqlite3` 备份。
+重排前的数量分别为 56、632、154、78；目前 920 个任务均为 `pending`，
+旧 `gitlab.com` 401 为零。**无需再执行重排**。于本目录手动启动：
+
+```bash
+SWH_HISTORY_PROXY=http://127.0.0.1:7892 bash ./run_all.sh --api-only
+```
+
+今后若出现新的旧 401，`--apply` 会为每个有命中任务的分片备份 SQLite，再只把
+`host='gitlab.com' AND status='unavailable_http_401'` 改为 `pending`。
+它不修改其他 GitLab 实例、其他 HTTP 状态或已完成任务。
+
+```bash
+python3 retry_failed.py --gitlab-401
+python3 retry_failed.py --gitlab-401 --apply
+```
+
+上面的 `run_all.sh --api-only` 只处理 API 队列，不重跑 Git 镜像或归档。
+四个分片默认共用
+项目根目录 `.env` 中的 `GITLAB_TOKEN`；按 Ctrl+C 可停止并保留检查点。
+成功读取 issue/MR 列表后还可能发现更多评论或分页任务，因此最终 API
+请求数可能大于 920。
+补抓结束后检查四份 `status.json` 的 `api_status`，并抽查新增页面。
+
+以下是 2026-10-27 的原始交接记录，表中的仓库数和启动状态仅作为
+历史基线，不代表上述最终状态。
+
 GitHub 仓库包含每个分片的 `run.sh`、`collector/*.py`、`input.csv`、
 本说明和 `split_manifest.json`。四份 `input.csv` 内容相同，是约
 2.8 MB 的任务清单，不含源码。SQLite 检查点、已下载的 Git 镜像、
@@ -29,6 +76,21 @@ API 不可访问状态保留，等待凭据或单独补查，因此 `queues/api.
 
 ## 迁移和启动
 
+四个分片都在同一台机器时，在本目录运行 `bash ./run_all.sh`。它并行启动
+四份原有 `run.sh`，各自复用 `manifests/state.sqlite3` 并追加写入对应的
+`run.log`。按 Ctrl+C 会向四组工作进程发送终止信号。启动前可用
+`python3 retry_failed.py` 查看已失败任务；`python3 retry_failed.py --apply`
+会先为每份数据库创建时间戳备份，再把 Git、API 和归档中 `failed` 的
+任务改为可重试。已完成任务、`inaccessible` 和 HTTP 终态不受影响。
+请在收集器停止后执行重排，勿与单个分片的 `run.sh` 同时启动。
+
+统一入口默认读取项目根目录的 `.env`，也可设置
+`SWH_HISTORY_ENV_FILE=/path/to/.env`；四份代码均识别
+`GITHUB_API_TOKEN`。若需要代理，可设置 `SWH_HISTORY_PROXY`。
+四份并发共享同一个 GitHub token 的 API 配额，不会得到四倍额度。
+2026-11-01 已备份四份检查点，并把 643 个 Git、672 个 API 页和
+70 个归档的 `failed` 状态重排为可重试；原错误保留在数据库中。
+
 每台机器只复制其中一个 `shard_i/` **整个目录**。包括 `input.csv`、
 `manifests/state.sqlite3`、`repos/`、`trackers/`、`packages/`、
 `collector/` 和 `toolchain/`；不要只复制 `queues/*.csv`。复制结束后在
@@ -55,9 +117,10 @@ ETag 或 Last-Modified 且 Range 匹配时才按字节续传；Git 对象库保�
 兼容的 Linux 库和 `/usr/lib/git-core` 布局。若不兼容，运行时指定
 `--git-exec-path /usr/lib/git-core` 使用目标机自带 helper；先检查目标机
 的 Git/TLS 可用性。脚本默认在低于 100 GiB 空闲空间时暂停，可按机器
-容量在 `./run.sh --min-free-gib N` 中调整。认证信息放在每台机器的
-`shard_i/.env`，无需复制原项目 `.env`；无 GitHub token 时，四台机器
-若共用同一出口 IP，匿名 API 配额不会变成四倍。
+容量在 `./run.sh --min-free-gib N` 中调整。单独运行分片时，
+`shard_0/1` 默认读取项目根目录 `.env`，`shard_2/3` 默认读取各自的
+`shard_i/.env`；也可以统一设置 `SWH_HISTORY_ENV_FILE`。无 GitHub token
+时，四台机器若共用同一出口 IP，匿名 API 配额不会变成四倍。
 
 进度：
 

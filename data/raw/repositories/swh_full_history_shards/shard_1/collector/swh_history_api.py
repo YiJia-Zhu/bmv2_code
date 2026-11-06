@@ -42,18 +42,21 @@ class API:
         self.github_token_fingerprint = None
 
     def refresh_credentials(self):
-        token = self.token("GITHUB_TOKEN", "GH_TOKEN")
+        token = self.github_token()
         fingerprint = stable_id(token) if token else "anonymous"
         with self.lock:
             previous = self.github_token_fingerprint
             self.github_token_fingerprint = fingerprint
-            if previous and previous != fingerprint:
+            if token and previous != fingerprint:
                 self.next_at.pop("api.github.com", None)
                 self.state.execute("""UPDATE api_tasks SET next_at=0 WHERE host='github.com'
                     AND status='retry_wait' AND (error='host_quota_wait' OR error LIKE '%rate_limited%')""")
                 self.state.execute("""UPDATE api_tasks SET status='pending',next_at=0,attempts=0
                     WHERE host='github.com' AND status IN ('unavailable_http_401','unavailable_http_403')""")
                 self.state.event("github_credentials_changed", authenticated=bool(token))
+
+    def github_token(self):
+        return self.token("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_API_TOKEN")
 
     def token(self, *keys):
         # Reload selected keys only: adding a token does not require restarting.
@@ -72,7 +75,7 @@ class API:
                    "Accept": "application/json"}
         token = None
         if parsed.hostname == "api.github.com":
-            token = self.token("GITHUB_TOKEN", "GH_TOKEN")
+            token = self.github_token()
             headers["Accept"] = "application/vnd.github+json"
             headers["X-GitHub-Api-Version"] = "2022-11-28"
             if token:

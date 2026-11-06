@@ -145,10 +145,13 @@ data/tasks/bmv2_full_auto_prompts.jsonl
 !/data/raw/repositories/swh_full_history_shards/
 /data/raw/repositories/swh_full_history_shards/*
 !/data/raw/repositories/swh_full_history_shards/README.md
+!/data/raw/repositories/swh_full_history_shards/run_all.sh
+!/data/raw/repositories/swh_full_history_shards/retry_failed.py
 !/data/raw/repositories/swh_full_history_shards/split_manifest.json
 !/data/raw/repositories/swh_full_history_shards/shard_[0-3]/
 /data/raw/repositories/swh_full_history_shards/shard_[0-3]/*
 !/data/raw/repositories/swh_full_history_shards/shard_[0-3]/run.sh
+!/data/raw/repositories/swh_full_history_shards/shard_[0-3]/resume_api.sh
 !/data/raw/repositories/swh_full_history_shards/shard_[0-3]/input.csv
 !/data/raw/repositories/swh_full_history_shards/shard_[0-3]/collector/
 /data/raw/repositories/swh_full_history_shards/shard_[0-3]/collector/*
