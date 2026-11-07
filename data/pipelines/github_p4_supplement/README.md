@@ -56,9 +56,37 @@ tmux attach -t github-p4-supplement
 输出目录的第二个 `run` 实例会被独占锁拒绝。搜索结束后运行
 `export` 生成 CSV，再检查 `status` 中是否存在 `failed`/`unresolved`。
 
-## 下一个阶段
+## 单文件筛查
 
-先检查 `jobs` 是否全部 `complete`，把 `failed`、`unresolved` 和
-`incomplete_results` 作为明确覆盖缺口；然后对新增候选核实真实 `.p4`
-文件，逐文件判断 P4_16，并将确认的新仓库交给独立的完整历史下载清单。
-不将 `language:P4` 或关键词命中直接作为 P4_16 证明。
+2026-11-06 搜索队列有 232 个 `complete`、229 个已拆分 `split` 和
+3 个 `unresolved` 分区。导出的 `candidate_repositories.csv` 含 45,955 个
+GitHub ID；其中 2,101 个仓库有 `.p4` 文件搜索证据。`unresolved`
+是搜索覆盖缺口，后续筛查结果不能消除它。
+
+`screen.py` 从搜索 SQLite 初始化仓库、路径和 blob OID，再读取搜索命中
+blob 与默认分支 Git tree。GitHub 两个独立账号的
+`GITHUB_API_TOKEN`、`GITHUB2_API_TOKEN` 已分别验证可用，程序按
+token 的 REST 速率头节流。默认树请求若截断会逐层读取子树；单仓库超过
+128 次子树请求会记为 `tree_limit` 失败，待专项补查，不当作无 P4。
+内容按 Git blob OID 缓存和校验，并复用 SWH 单文件版本、复核及质量函数。
+`p4_16_likely` 只是静态证据，不是编译确认。
+
+```bash
+python3 data/pipelines/github_p4_supplement/screen.py init
+SWH_HISTORY_PROXY=http://127.0.0.1:7892 \
+  python3 -u data/pipelines/github_p4_supplement/screen.py run \
+  --phase all --workers 20 --token-interval 0.75 \
+  >> data/raw/github_p4_supplement/screen/run.log 2>&1
+python3 data/pipelines/github_p4_supplement/screen.py status
+python3 data/pipelines/github_p4_supplement/screen.py export
+```
+
+输出在 `data/raw/github_p4_supplement/screen/`：
+`screen.sqlite3` 是仓库、文件关系和 blob 检查点；
+`raw_blobs/` 保留已验证的原始文件；`status.json` 和 `run.log`
+记录每阶段进度、吞吐、ETA 与每个 token 的请求数。中断后重跑相同
+`run` 命令即可续跑，单实例文件锁防止同时改写。瞬时错误保留
+`pending`，下一轮重试；终态 `failed` 要先检查原因，再用
+`screen.py retry-failed` 显式重新入队。`export` 生成
+`file_evidence.csv` 和 `repository_screen.csv`，含全部仓库关系及
+无法判定状态。默认分支无 `.p4` 只表示当前 HEAD 未发现，不能排除历史。

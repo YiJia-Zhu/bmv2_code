@@ -1,7 +1,11 @@
 # P4 文档知识语料 TODO
 
-状态：规划稿，2026-11-05。此计划从代码收集完成后的**文档知识**
-出发；不启动网页全量抓取，也不从代码文件数推算文档数量。
+状态：OLMo/Dolma 3 定向召回规划稿，2026-11-06；种子试采已开始，
+尚未下载 Dolma 3、训练分类器或运行召回。此计划从代码收集完成后的**文档知识**出发，
+不从代码文件数推算文档数量。
+
+考虑到硬盘空间紧缺，本任务放到ssh xiegr@172.22.11.186上目录storage/xgr/zhuyijia/bmv2_code上完成，注意尽量保证git同步，我已经手动同步.env过去，你拥有完全控制这个目录以及访问这个服务器的权限
+
 
 ## 目标与边界
 
@@ -12,126 +16,245 @@ v1model/BMv2 和 PSA 等架构知识、编译/调试说明、使用场景及问�
 教程中的代码块与说明文字分别标注，不能把代码片段、
 完整源码和基准题混作同一种样本。
 
-文档知识也不等于越多越好。首轮先覆盖权威规范、官方教程、
-架构/工具文档和可使用的专题论文，再用定向网页发现补缺；
-先试点、评估，再决定是否需要 Common Crawl 级别的召回。
+首轮从下文列出的 P4 站点、课程、规范和问答中定向收集种子文档，
+用于正例标注、分类器训练和覆盖率核对；批量候选召回只读取
+OLMo 3 发布的 Dolma 3 数据。不另行下载 Common Crawl/FineWeb、
+不启动全网爬取或其他网页池。Dolma 3 的网页部分本身源于
+Common Crawl；这里的“只用 OLMo”限定的是批量候选池，
+不排斥为种子采集公开的 P4 专题页面。
 
-## 从论文得到的具体做法
+## 已核实的论文方法与本项目选择
 
-| 参考 | 可迁移到 P4 文档的做法 | 本项目的边界 |
+| 参考 | 原文实际做法 | 对 P4 召回的决定 |
 | --- | --- | --- |
-| FineWeb，§3-4 | 从原始 HTML 提正文；记录 URL/语言/质量过滤和去重的消融结果；用少量人工或模型标注训练“有教学价值”评分器 | 论文的英语网页标点、行长阈值和 FineWeb-Edu 的 0-5 分、阈值 3 不能直接用于含代码块、表格和公式的 P4 规范。FineWeb 比较后采用按 crawl 去重，说明“全局去重一定更好”并不成立 |
-| OpenCoder，§2.1.2、§4.4 | 从高精度代码相关文本种子出发，结合分类器、站点/URL 路径审核发现网页；对评测样本做去污染 | OpenCoder 的广义编程网页召回不能直接证明页面讲的是 P4；“P4”也可能是其他缩写，需领域人工复核 |
-| OLMo 3，§3.4、§3.4.1-3.4.2 | 分别发布来源池、实际训练混合、处理配方与中间状态；HTML/PDF 各用合适的提取器；精确、近似、重复片段分层处理；按主题/质量控制混合 | OLMo 3 的 9T 源池、约 6T 训练混合及 104 份网页快照是通用预训练规模，不是 P4 目标量。该文对大规模网页全局去重的选择也不能替代 P4 版本保留实验 |
-| Qwen3 / Llama 3 / Gemma 3 技术报告 | 借鉴多来源数据配方、阶段化训练和代码/知识数据的分层组织 | 它们公开了报告与权重，但没有提供可逐条重建的完整训练原文；仅把报告中的来源类别当作设计参考，不能声称复现其语料 |
+| OpenCoder §2.1.2 | 从 Common Crawl 标注约 50 万条代码类种子，训练 fastText 分类器；按分类命中分析域名，人工审核 URL 路径，补入漏判种子，迭代三轮。中文处理前用了 BPE 分词。 | 采用“高精度种子 + CPU fastText 二分类 + 域名/路径误差分析 + 迭代”的流程；训练目标改成 P4 文档相关性，不沿用其泛代码分类器。 |
+| FineWeb §4 | Llama 3 给 46 万网页打 0–5 教育分；冻结 Snowflake Arctic Embed M，训练线性回归预测分数，再以 3 分为阈值。全文推理报告约 6000 H100 小时。 | 这是教育质量评分，不是 P4 领域召回；不在全池用嵌入模型推理，也不照搬 3 分阈值。 |
+| OLMo 3 §3.4.1 | Dolma 3 网页池先清洗去重，再用蒸馏为 fastText 的 WebOrganizer 分 24 个主题；另用 fastText 质量分类器打分，在每个主题内分 20 个 5% 质量档。 | 主题与质量档可以排序扫描，但都不是 P4 相关性标签；仍须单独训练 P4 分类器并验证漏召。 |
 
-本项目追求 OLMo 3 式的**可审计交付**：来源清单、原件哈希、
-处理配置与代码版本、每步保留/剔除原因、训练视图的精确 manifest。
-“可公开训练”与“可公开再分发”必须分别判断，模型开放权重
-并不自动授予任何上游文档的再分发许可。
+**模型决策：**首轮用 CPU 原生 fastText 监督式二分类
+`P4_document` / `other`。`predict` 的正类分数用于排序和阈值，
+不是经校准的真实概率。阈值在独立验证集上按召回率、人工复核量
+和每 GB 候选数选定；不预先指定 0.5。OLMo 原有质量分只作为
+排序/分析特征，不替代领域标签。额外的“教学价值”、P4 版本、
+架构、内容类型在召回后标注，避免一个模型同时承担不同目标。
 
-## 来源优先级
+## 唯一批量数据源与下载边界
 
-| 优先级 | 来源和发现入口 | 采集单位与注意事项 |
+| 数据集 | 用途和已核实规模 | 决定 |
 | --- | --- | --- |
-| A | P4 语言与架构规范：p4lang/p4-spec、P4.org 指向的正式版本、v1model/PSA/PNA 相关规范 | 每一发布版及文档章节；保留版本号、发布日期、原始 PDF/HTML/Markdown 和章节锚点。规范中的例程单独标记 |
-| A | p4lang/tutorials、p4c、behavioral-model、PI 等官方项目发布的独立教程和工具文档 | 按发布版或文档站点快照收集；标记对应的编译器/目标版本 |
-| B | P4 专题论文、技术报告、课程讲义和公开教材 | 先收 DOI/arXiv/作者/版本/许可元数据；允许时保存全文。数字 PDF 先直接提文本，失败再 OCR；图表、公式、页码和引用不可悄悄丢掉 |
-| C | 官方论坛、P4 相关问答和经过人工审核的技术网页路径 | 以准确的 P4_16、p4c、BMv2、架构术语及高精度域名/路径为种子；用站点 API 或授权数据源。仅在许可、robots.txt 与站点条款允许时抓取，记录抓取时间和页面版本 |
-| C | 可复用的公开网页/论文语料索引（例如 FineWeb/Common Crawl、开放学术索引） | 只做遗漏发现与定向召回，不预设要下载整个通用网页语料；命中后核对原始 URL、主题、许可和版本 |
+| [Dolma 3 Pool](https://huggingface.co/datasets/allenai/dolma3_pool)，修订 `6462556697df1a8f5c953727e9c686629ad98b68` | 9.31T token 来源池，其中 Common Crawl 网页 8.14T token、约 96.7 亿篇；仓库约 18 TB 压缩数据。目录为 `data/common_crawl-<topic>-<vigintile>/shard_*.jsonl.zst`；另有 olmOCR PDF。 | **主召回池**。先网页；PDF 只在评估发现论文/规范覆盖缺口后按同一 OLMo 池扩展。 |
+| [Dolma 3 150B 样本](https://huggingface.co/datasets/allenai/dolma3_mix-150B-1025)，修订 `afa92bfb22366821c5e6cd427cdd036b34b713ef` | 约 135.8 GB 压缩，含 8450 万网页。 | 可取少量 shard 验证读取器；抽样未命中不代表全池未收录。无需下载完整 150B。 |
+| [Dolma 3 6T Mix](https://huggingface.co/datasets/allenai/dolma3_mix-6T)，修订 `689a3ea2d8217e64d73a5058913fa43ad15e81aa` | 约 4.41 TB 压缩，是 Olmo 3 32B 的训练混合，网页仅是其中一部分。 | 只用于后续核对“召回文档是否进入实际训练混合”，不代替较大的来源池。7B 专用 mix 的数据卡明确要求其他用途改用主 mix。 |
 
-来源登记表先记录：来源类型、入口 URL、所有者、访问方式、
-覆盖的 P4 版本/架构、更新时间、robots/条款、内容许可、
-是否允许训练、是否允许再分发、采集状态。许可不明确的来源
-可先保留元数据和指针，不能默认进入可发布训练视图。
-对论坛和问答保留署名/归属、原始链接和适用的署名或相同方式共享要求；
-不绕过登录、付费墙或访问限制。
+以上是 2026-11-06 查询数据卡/API 的快照，开始执行前重新固定修订、
+分页枚举全部文件并核对每个文件大小/哈希。数据卡的 ODC-BY 不自动
+解决网页原作者的训练与再分发许可；命中后仍单独审核原始 URL 和
+归属。Pool 数据卡未列出完整行级字段，首个 shard 必须检查 `text`、
+URL、时间、source 与 metadata 的实际结构；URL 缺失时不能声称
+完成 URL 路径分析或源站许可审核。
+
+远端 `/storage` 当前约 14 TB 可用，小于整个 Pool 仓库约 18 TB。
+下载只以 shard 为单位，校验后流式解压、处理和生成可续跑 checkpoint；
+不将全池镜像或解压到磁盘。原始 shard 可在保存版本、路径、上游哈希、
+本地校验与命中记录后释放，保留可重取的精确指针。任何大批量下载
+均在试点测出吞吐、费用/时间和峰值空间之后排程。
+
+## P4 种子 URL 与标注
+
+以下是待核对的发现入口，不把整个站点、搜索结果或相邻主题自动
+标为正例。每个入口展开为具体页面、文档、章节或问答，保留标题、
+规范/架构版本、原始 URL、发布时间、获取时间、许可、原件哈希。
+种子原件与从 OLMo 召回的候选分开存放和计数。
+
+1. **P4.org 站点图。** 从 https://p4.org/ 入队，覆盖其 Developer
+   Day、Working Group、Specifications、Blogs、Forum、Publications
+   等栏目及逐层子页面。规范查找 P4 语言、PSA、TNA、P4Runtime、
+   v1model/BMv2 等公开资料；TNA 等厂商资料可能在站外，需记录
+   指向的实际发布者与可访问性。https://forum.p4.org/ 单独作为
+   问答入口，保留问题、回答、作者和帖子时间。
+2. **苏黎世网络课程。** 从 https://adv-net.ethz.ch/2018 到
+   https://adv-net.ethz.ch/2025 逐年核对课程页面及 Material
+   栏目，收集公开讲义、幻灯片/PPT、PDF 与课程链接；同时登记
+   ETH Zurich 相关网络课程中实际讲授 P4 的页面。年份页是否
+   存在、材料版本和许可逐项核对，不能把课程目录当成正文样本。
+3. **P4Lang 项目站点与 Wiki。** 从 https://github.com/p4lang/
+   枚举项目，只跟进各项目公开的 GitHub Wiki、GitHub Pages、
+   独立文档站和发布说明链接；本轮不从仓库文件树抽取 README、
+   源码或 `.p4` 文件。不存在的 Wiki 记录为无入口，不生成空样本。
+4. **P4.org LinkedIn。** 登记官方 LinkedIn 主页的 Articles 和
+   Documents 两个模块及各篇公开文章/文档 URL。页面若要求登录
+   或限制访问，只记指针与可见元数据，不绕过限制。
+5. **搜索发现。** 用 Google 搜索 P4、BMv2、Tofino、
+   Vitis Networking P4、P4 eBPF 的博客、文字教程和专题网站；
+   对 Tofino 与 Vitis Networking P4 另查 `user guide`、
+   `IP manual`、`product guide`、`pdf` 等组合词。搜索结果只
+   产生待复核 URL，优先官方/原作者文档；不能把搜索结果摘要
+   直接当训练文本，厂商手册须核对版本和分发许可。
+6. **协议 RFC。** 以 https://www.rfc-editor.org/rfc/ 为官方入口，
+   对 RFC 791–2000 范围先按标题/主题筛选与包头、协议解析、
+   转发或 SDN 相关的条目，而非整段范围无差别抓取；明确列入
+   RFC 768、791、7149、7348、7426、8200、8321、8926、
+   9293、9817 等。每篇以 `rfcNNNN.html` 或官方 PDF 为样本，
+   记录编号、状态和修订/勘误，供 P4 header 与协议知识标注。
+7. **EuroP4。** 登记 EuroP4 '26 的活动页、议程、论文/演讲
+   和公开幻灯片入口；若 2026 材料尚未发布，只保留待检查 URL
+   和状态，不用历史年份材料冒充 2026 资料。
+8. **Stack Overflow P4 问答。** 以 P4、BMv2、Tofino、
+   Vitis P4、P4 eBPF 等词检索问题与回答，记录原帖 URL、
+   问答时间、标签、作者和采纳/评分状态。可参考
+   [StackExchange Archive 2024](https://archive.org/details/stackexchange)
+   的 Stack Overflow dump 定向查询；只抽出经复核的 P4 问答
+   作为种子，不把整个 dump 加入 OLMo 批量候选池。
+
+P4.org 的站点发现采用持久化 FIFO 队列：取队首 URL，抓取并保存
+一份页面/文档原件及元数据作为样本，提取页面中每一个子链接，
+规范化 URL 后入队；维护 `queued`/`visited` 状态，避免重复、重定向
+循环、日历/搜索无限翻页和带跟踪参数的 URL 膨胀。站内链接按
+P4.org 范围继续抓取；站外链接同样记录在发现队列，但仅在属于
+上表已批准的来源范围、公开可访问且许可/访问规则允许时自动抓取，
+其余标为 `pending_review`。HTML 子页、PDF、PPT、问答分别记录
+内容类型和提取状态；按域名限速、可中断续跑。页面中的每一个
+链接都有发现记录，但不是每一个链接都自动成为 P4 正例。
+
+首批目标为约 200–500 条正例文档/章节，覆盖不同站点、版本和任务；
+从 OLMo 小样本随机抽取及主动挖掘约 1000–3000 条负例，包含
+GPU P4、医学/课程编号 P4、非 P4 的普通网络文章、泛编程网页、
+纯代码或导航页等难负例。“P4”单词本身不是正例证据。
+标注准则为：正文确实解释 P4 语言、架构、编译/运行工具或实践，
+且不是只有无说明的源码。将含糊样本留在 `uncertain`，不强制
+塞入二分类训练集。训练/验证按站点和文档系列分组，防止同一规范
+转载或相邻章节泄漏；另保留独立的 OLMo 随机样本估计真实精度。
 
 ## 执行阶段
 
-1. [ ] **冻结边界与来源登记。** 确定首轮独立文档来源和基准题清单；
-   建立来源登记表、许可
-   与抓取策略。输出带状态的 source_registry.jsonl。这里先统计
-   可访问文档数、类型、预估字节/页数。
-2. [ ] **收集权威外部材料。** 先规范、架构文档和教程，后论文/课程，
-   最后定向网页。每次采集保存原始字节、响应/版本元数据和 SHA-256；
-   对不可下载或不可训练来源记录原因。按来源域限并发，支持 URL、
-   PDF 或 API 页级恢复；不启动不受控的全网爬取。
-3. [ ] **做小规模提取试点。** 从每类来源分层抽样，总计约 200-500
-   篇候选；HTML 提正文并保留标题/标题层级/链接，Markdown 保留
-   标题与代码围栏，PDF 优先解析数字文本、必要时 OCR，并保留
-   章节与引用关系。抽查至少 20 篇/类：正文完整性、代码块
-   与表格、公式、引用、错页/乱码。根据错误类型选提取器，不按
-   FineWeb 的网页阈值直接删技术文档。
-4. [ ] **领域标注与清洗。** 给文档/章节打
-   P4_relevant、P4_14/P4_16/unknown、架构、来源可信度、
-   内容类型和教育价值标签。先人工标注分层样本，必要时才训练
-   轻量领域分类器；保留分数和模型版本。去导航、模板、广告、
-   重复签名和明显垃圾；保留有意义的代码、命令、表格与反例。
-   敏感邮箱、凭据和个人信息另作可审计脱敏，不改原件。
-5. [ ] **去重并保留版本。** 正文规范化哈希做精确去重，MinHash/局部
-   相似度只产生候选簇，再核对章节、版本和架构。跨站转载的同一
-   文档可共享一个训练代表，但保留所有 provenance；P4_14
-   与 P4_16、不同规范版之间的语义差异必须保留。比较“每快照/
-   每版本去重”和“全局去重”对覆盖率及答案正确率的影响，
-   再定最终训练视图。长文按标题/段落切块，块与原件双向关联。
-6. [ ] **冻结评测后去污染。** 先确定隐藏的 BMv2 任务、参考代码、
-   题面、家族 ID 和 holdout 仓库。文本与代码两路分别做规范化精确
-   匹配、长 n-gram/近似匹配和引用链检查；报告可疑命中，由人工
-   判断删块、删文档或整组隔离。通用 P4 规范无需因出现通用语法
-   而全删，但不得把具体保密题面或答案纳入训练。按文档系列/语义家族
-   划分，避免同一教程的改写跨训练与测试。
-7. [ ] **生成版本化视图与评估。** raw 保留所有获准保存的原件；
-   normalized 保留结构化文本；train 仅含许可、质量和去污染均通过
-   的样本。记录每来源/语言/版本/架构的文档数、去重前后 token、
-   剔除原因、抽检错误率与未覆盖知识点。用固定 P4 问题、
-   检索证据正确率和 BMv2/编译任务作小规模对照，再决定主题权重、
-   是否需要扩展网页召回及正式训练配方。
+1. [ ] **数据清单与读取器试点。** 在远端固定 Pool revision，分页
+    枚举 web/PDF shard、topic、质量档、大小与哈希；记录磁盘余量、
+    网络和 CPU 限额。先取 1–2 个约百 MB 的 web shard 验证
+    JSONL/zstd、URL/metadata 和断点恢复；不提前下载 150B 或全池。
+2. [~] **种子发现、定向采集与标注。** 核对上述八类入口；先实现
+    P4.org 持久化队列、URL 规范化、visited 去重、原件保存和
+    断点续跑，再采集课程材料、项目 Wiki、RFC 和经审核的问答。
+    建立 URL/章节级正例和硬负例，固定标注规则及按站点分组的
+    train/dev/test。基准题、隐藏参考代码和 holdout 仓库先登记，
+    不能进入分类器种子。
+3. [ ] **CPU 基线与训练。** 先比较 URL/术语规则与 fastText 二分类。
+    fastText 使用词/字符 n-gram，保留 `P4_16`、`p4c`、`BMv2`、
+    `v1model` 等关键写法；只在需要中文种子时试 OpenCoder 的 BPE。
+    记录线程数、模型大小、训练时间、每秒文档数/压缩 GB 数。
+    在不同站点、主题和质量档的验证集上画精确率-召回率曲线；
+    选满足 P4 正例召回目标（暂定至少 95%）且人工审核量可承受的
+    阈值。再抽查规则和低分区漏判；单纯的 F1 最高点不作为阈值。
+4. [ ] **小规模 OLMo 召回。** 从 Pool 的软件开发、软件、
+    科技、电子硬件及随机其他主题，跨高/中/低质量档取分层 shard
+    （初始约 24–48 个、压缩量上限约 5 GB）。先测全量 fastText
+    与“高召回术语/URL 粗筛后 fastText”两路；只有粗筛在独立抽样
+    中未产生不可接受的漏召，才把它用于全池加速。人工复核高分、
+    阈值附近、规则命中但模型漏判以及双路均拒绝的样本。
+5. [ ] **决定扫描范围并分批召回。** 根据试点的实际 MB/s、
+    每十亿文档候选数、分层漏判和预计总耗时，先扫描高产 topic/
+    质量档，再扩大到其余档与主题。若只扫描部分 shard，manifest
+    必须写 `partial` 和未扫描清单，不能宣称“全 OLMo 召回”。
+    shard 下载/处理并发按磁盘、网络和 CPU 实测设限；每个 shard
+    独立校验、原子 checkpoint、可重试，处理后只保留命中文档
+    原始行及必要审计信息。运行阶段不使用 GPU。
+6. [ ] **复核、去重、去污染。** 人工审核候选是否真属 P4，并标记
+    P4_14/P4_16、架构、来源类型和质量；从命中站点/路径中发现
+    漏判 URL，复核后回灌种子并重训，记录迭代版本。正文精确哈希
+    和近似聚类只用于候选去重，保留不同规范版本。冻结 BMv2
+    benchmark 后做题面、参考代码、家族和 holdout 的去污染。
+7. [ ] **生成训练视图和覆盖报告。** 仅将许可、内容质量与去污染
+    均通过的记录进入 train；保留 rejected、uncertain、只存指针
+    三类。报告分主题/质量档/站点/版本的命中率、人工精度、
+    漏召估计、去重前后文档与 token 数、分类耗时及未覆盖知识点。
+    是否扩展到 Pool 的 olmOCR PDF 在此后依据缺口决定，不引入
+    其他批量网页来源。
 
 ## 数据契约与目录
 
-建议独立于源码树：
+计划在远端 `/storage/xgr/zhuyijia/bmv2_code` 执行，源代码用 Git
+同步；`.env` 已由用户同步，不写入 manifest、日志或 Git。
+文档数据独立于 P4 源码树：
 
-~~~text
-data/raw/p4_text/source_registry.jsonl
-data/raw/p4_text/<source_id>/...          # 允许保存的 HTML/PDF/MD/API 原件
-data/normalized/p4_text/documents.jsonl   # 文档和章节、块索引
-data/normalized/p4_text/occurrences.jsonl # URL/版本/转载位置的多对多出现关系
+```text
+data/raw/p4_text/seed_registry.jsonl
+data/raw/p4_text/seed_crawl/queue.jsonl
+data/raw/p4_text/seed_crawl/discovered_links.jsonl
+data/raw/p4_text/seed_crawl/<source_id>/... # 页面/PDF/PPT/问答原件
+data/raw/p4_text/dolma3/shard_manifest.jsonl
+data/raw/p4_text/dolma3/hit_rows/...      # 命中的原始 JSONL 行；非全池镜像
+data/normalized/p4_text/labels.jsonl
+data/normalized/p4_text/review_queue.jsonl
+data/normalized/p4_text/recall_runs/<run_id>/shard_status.jsonl
+data/normalized/p4_text/recall_runs/<run_id>/candidates.jsonl
+data/normalized/p4_text/documents.jsonl
+data/normalized/p4_text/occurrences.jsonl
 data/normalized/p4_text/views/<version>/train.jsonl
 data/normalized/p4_text/views/<version>/excluded.jsonl
 data/normalized/p4_text/views/<version>/manifest.json
-~~~
+```
 
-最小文档记录包含 doc_id、source_id、source_type、canonical_url、
-retrieved_at、raw_sha256、raw_path、license_evidence、permission_flags、
-title、language、P4_version、architecture、extractor/version、
-text_sha256、section_id、parent_doc_id、quality/relevance 标签、
-duplicate_cluster_id、split、exclusion_reasons。
-一个文档可出现在多个站点或多个版本；
-doc_id 代表内容，occurrence 代表每一次来源出现，不能因正文去重
-丢失 URL、归属和版本证据。
+种子队列记录发现来源、原始/规范 URL、父 URL、域名、深度、
+入队时间、抓取状态、HTTP/内容类型、许可/访问状态和失败原因；
+保存的种子样本记录原件 SHA-256、提取器版本及页面子链接清单。
+shard 清单至少包含 dataset ID/revision、相对路径、字节数、上游哈希
+和本地 SHA-256、下载与处理状态、记录数、命中数、分类器版本、
+阈值、耗时、错误与重试次数。候选至少包含原始 `id`、shard 路径、
+行号、text 哈希、URL/metadata 原文、topic/质量档、规则命中原因、
+fastText 原始分数、阈值版本、人工判定及剔除原因。URL 缺失明确
+记 `null`，不可从正文猜造。`doc_id` 代表内容，`occurrence` 代表
+每次来源出现；跨站转载去重后仍保存来源和版本证据。
 
-每个视图 manifest 固定输入快照、来源清单哈希、处理代码 commit、
-提取器/分类器版本、过滤和去重配置、tokenizer、随机种子、
-许可策略、评测集版本、样本 ID 列表及各阶段计数。任何视图均可从
-原件及 manifest 重建；不覆盖前一版，不修改已保存的原件。
+每个视图 manifest 固定数据集修订、实际扫描 shard 列表和未扫描列表、
+处理代码 commit、分类器/规则/阈值、采样种子、过滤和去重配置、
+许可策略、评测集版本、样本 ID 与阶段计数。任何命中可由 pinned
+shard 重取核对；不覆盖前一版，不修改保存的原始命中行。
 
 ## 首轮验收
 
-- 来源清单覆盖所有实际使用的输入；训练样本 100% 能反查原始字节、
-  URL/来源位置、抓取时间和处理版本，且许可状态已审核。
-- 试点抽检按来源/格式分层公布数量、主要提取错误和 P4 相关性误判；
-  对规范章节、代码围栏和问题答案尤其检查，达到可用标准后再放量。
-- 每一步输出前后文档数与 token 数、按原因的排除量；版本保留、
-  镜像去重和跨来源相似簇可以抽样复核。
-- 对冻结的基准题生成去污染报告；知识覆盖和检索/编译对照有可复现
-  的基线。不能只用“抓到多少页”作为成功标准。
-- 可公开原始集合、可公开训练视图、只能内部使用以及只保留元数据
-  的来源分开统计，避免把公开论文或网页误称为自由再分发语料。
+- 下载前能列出固定修订、shard 总量/大小和抽样方案；试点能报告
+  CPU 文档/s、压缩 MB/s、峰值内存/磁盘及投影总耗时。
+- 八类种子入口及 P4.org 链接发现有可恢复队列、抓取/跳过原因
+  和原件哈希；每个正例能追溯到具体页面或章节。
+- 按站点留出的 P4 正例召回至少达到试点目标（暂定 95%），
+  同时公开随机 OLMo 样本的人工精度、阈值附近和拒绝区漏判；
+  不以均衡验证集的准确率代替真实池的候选精度。
+- 每个扫描 shard 可恢复、可追溯；所有训练样本能反查 OLMo
+  原始行、shard/revision、分类器与许可审核状态。
+- 版本保留、跨来源去重和 benchmark 去污染均有可复核报告；
+  公开原始数据、可公开训练、仅内部使用和仅保留指针分开统计。
+- 全池未扫描完就明确报告覆盖比例与缺失范围，不以候选页数
+  代替 P4 知识覆盖或训练有效性。
+
+## 2026-11-06 远端种子试采记录
+
+- 执行位置：`xiegr@172.22.11.186:/storage/xgr/zhuyijia/bmv2_code`；
+  使用 `data/pipelines/p4_text_seeds/collector.py` 的 SQLite FIFO 队列，
+  原件和提取文本在远端 `data/raw/p4_text/seed_crawl/`，不纳入 Git。
+  运行时逐域限速 1 秒、页面深度至多 2、单响应上限 8/15 MB。
+- P4.org 首页、规范目录、ETH 2018–2025 年入口、P4 Forum 首页与
+  10 篇指定 RFC 均已保存。另抓 P4_16 v1.2.5、PSA v1.2、
+  P4Runtime v1.4.1 的 HTML 规范和 4 份 ETH P4 讲义 PDF。
+  Developer Day、Working Groups、Publications、Blog、EuroP4 '26
+  的入口页和两条 Forum 主题 HTML/公开 JSON 也已保存。
+  共 44 条已抓、190 条待抓、4 条错误；4 条错误均为 34–45 MB
+  的 ETH 讲义超过 15 MB 限制，已保留 URL 和失败原因。
+- 规范目录发现 P4_16、PSA、PNA、P4Runtime 多版本链接。
+  P4.org 站外链接、ETH 跨年份目录和其他外站材料只保留发现记录，
+  等待来源/许可复核。GitHub Wiki、LinkedIn、Google 搜索、
+  EuroP4 专题页和 Stack Overflow 尚未专项采集；不能将入口数
+  当正例数。所有待审样本的标签仍是 `pending`。
+- 离线整理入口为 `prepare.py`：校验原件和文本哈希，按正文哈希
+  合并文档，保留每次 URL 出现，并生成独立 `review_queue.jsonl`。
+  当前为 44 条 URL 出现、42 份不同可读正文、40 条 `pending`
+  待审样本：两条旧 working-draft HTML 是空正文，两条 Forum
+  HTML 因有结构化 JSON 版本而仅保留在来源表。Forum JSON 保留
+  逐帖作者、时间和抓取/预期帖子数；长主题如抓取数不足需补取回复。
+  人工标签应写入单独 `labels.jsonl`，避免重跑覆盖审核结果。
+  当前数据只完成采集和整理，未产生训练正例。
 
 ## 参考资料
 
-- [The FineWeb Datasets: Decanting the Web for the Finest Text Data](ref_paper/fineweb.pdf)，特别是 §3 的提取、过滤、按 crawl 去重及 §4 FineWeb-Edu。
-- [OpenCoder: The Open Cookbook for Top-Tier Code Large Language Models](ref_paper/opencoder.pdf)，特别是 §2.1.2 代码相关网页、§4.4 去污染。
-- [Olmo 3](https://arxiv.org/pdf/2512.13961)，特别是 §3.4 的 Dolma 3 数据池/混合、网页/PDF 提取和去重。
-- [Qwen3 Technical Report](https://arxiv.org/abs/2505.09388)、[The Llama 3 Herd of Models](https://arxiv.org/abs/2407.21783)、[Gemma 3 Technical Report](https://arxiv.org/abs/2503.19786)：仅作公开配方与阶段设计参考，不视为已公开完整训练原文。
+- [OpenCoder](ref_paper/opencoder.pdf) §2.1.2：fastText、域名/URL 路径迭代召回。
+- [FineWeb](ref_paper/fineweb.pdf) §4：教育评分器及推理成本。
+- [Olmo 3](https://arxiv.org/html/2512.13961) §3.4.1：Dolma 3 网页池、fastText 主题/质量分档。
+- [Dolma 3 Pool 数据卡](https://huggingface.co/datasets/allenai/dolma3_pool)、[150B 样本数据卡](https://huggingface.co/datasets/allenai/dolma3_mix-150B-1025)、[6T Mix 数据卡](https://huggingface.co/datasets/allenai/dolma3_mix-6T)：修订、规模、格式与使用范围。
